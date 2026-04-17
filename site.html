@@ -1,0 +1,464 @@
+This is an interactive map website that displays key locations in Belarus during the Great Patriotic War (1941-1945). Click on any red dot to see historical information about that zone.
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Map of Belarus | Great Patriotic War (1941-1945)</title>
+    <!-- Leaflet CSS + JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Georgia', serif;
+            background: #2d2a1e;
+            color: #f0ead8;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* header styling */
+        .hero {
+            background: linear-gradient(135deg, #3a2c1f, #1f1a0e);
+            padding: 12px 20px;
+            border-bottom: 3px solid #b33b2c;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .hero h1 {
+            font-size: 1.7rem;
+            letter-spacing: 1px;
+            font-weight: 600;
+            display: inline-block;
+            background: linear-gradient(135deg, #e6c8a0, #c43c2c);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .hero p {
+            font-size: 0.9rem;
+            color: #e2dccd;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        .sub {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: #8b2c1e;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #ffe6c7;
+        }
+
+        /* map container */
+        #map {
+            flex: 1;
+            width: 100%;
+            background: #cfc9b0;
+            cursor: crosshair;
+            z-index: 1;
+        }
+
+        /* footer */
+        .footer {
+            background: #1e1b12;
+            padding: 8px 20px;
+            font-size: 0.7rem;
+            text-align: center;
+            color: #aa9f85;
+            border-top: 1px solid #5e4c36;
+            z-index: 10;
+        }
+
+        /* custom popup styling */
+        .custom-popup .leaflet-popup-content-wrapper {
+            background: #2e2b22;
+            color: #f7f2e0;
+            border-radius: 12px;
+            border-left: 6px solid #d64531;
+            font-family: 'Segoe UI', 'Georgia', serif;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+        }
+
+        .custom-popup .leaflet-popup-tip {
+            background: #2e2b22;
+        }
+
+        .custom-popup .leaflet-popup-content {
+            margin: 12px 18px;
+            line-height: 1.5;
+            font-size: 0.9rem;
+        }
+
+        .popup-title {
+            font-weight: bold;
+            font-size: 1.2rem;
+            border-bottom: 1px solid #d64531;
+            display: inline-block;
+            margin-bottom: 8px;
+            padding-right: 6px;
+            color: #ffbb77;
+        }
+
+        .popup-desc {
+            margin-top: 8px;
+            text-align: justify;
+        }
+
+        /* marker hover effect */
+        .leaflet-marker-icon.leaflet-div-icon {
+            background: none;
+            border: none;
+        }
+
+        /* custom red circle marker style (via circleMarker) we handle with CSS */
+        .info-note {
+            position: absolute;
+            bottom: 20px;
+            right: 12px;
+            background: rgba(0,0,0,0.7);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            z-index: 1000;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+            font-family: monospace;
+            color: #f5cf9f;
+        }
+        
+        @media (max-width: 700px) {
+            .hero h1 { font-size: 1.2rem; }
+            .hero p { font-size: 0.7rem; }
+            .popup-title { font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="hero">
+    <div class="sub">
+        <div>
+            <h1>⚔️ BELARUS · GREAT PATRIOTIC WAR 1941–1945</h1>
+            <p>🔴 Click any red dot → explore the heroic resistance, battles, and tragedy of each zone</p>
+        </div>
+        <div class="badge">📍 23 historical zones | Operation Bagration · Partisan movement · Liberation</div>
+    </div>
+</div>
+<div id="map"></div>
+<div class="footer">
+    <span>📜 Historical data: Brest Fortress defense, Minsk ghetto, Khatyn tragedy, partisan strongholds, and Red Army offensives. </span>
+    <span>🗺️ Map data: OpenStreetMap contributors | Memorial of the Great Patriotic War</span>
+</div>
+<div class="info-note">✨ Click on red dot → fly to zone & read detailed history</div>
+
+<script>
+    (function() {
+        // --- CENTER OF BELARUS ---
+        const belarusCenter = [53.7098, 27.9534];  // Minsk region as center
+        const map = L.map('map').setView(belarusCenter, 7.2);
+        
+        // Tile layer (clear, historical vibe)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB',
+            subdomains: 'abcd',
+            maxZoom: 13,
+            minZoom: 6
+        }).addTo(map);
+        
+        // custom red dot style: circle marker for all zones
+        // array of locations: name, coordinates, detailed history
+        const warZones = [
+            {
+                name: "⚔️ MINSK",
+                coords: [53.9045, 27.5615],
+                history: "🇸🇻 Capital captured on June 28, 1941. Nazis established the Minsk Ghetto, where over 100,000 Jews were imprisoned and massacred. The Minsk underground and partisans waged fierce sabotage. On July 3, 1944, the Red Army liberated Minsk during Operation Bagration — a strategic triumph. The city lost 80% of its buildings, but rose as a Hero City."
+            },
+            {
+                name: "🏰 BREST HERO FORTRESS",
+                coords: [52.0976, 23.7341],
+                history: "🔥 June 22, 1941: The Brest Fortress was one of the first targets. Soviet border guards and soldiers held out for over a month against German assaults, without water or supplies. Legendary defense became a symbol of invincible spirit. Almost all defenders died. In 1965, the fortress received the title 'Hero Fortress'."
+            },
+            {
+                name: "🕯️ KHATYN MEMORIAL",
+                coords: [54.334, 27.945],
+                history: "💔 March 22, 1943: Nazi punitive forces burned the village of Khatyn alive — 149 residents, including 75 children, were killed. Only a few adults survived. The memorial complex (1969) stands as a haunting reminder of over 600 Belarusian villages destroyed during the war."
+            },
+            {
+                name: "⚙️ VITEBSK",
+                coords: [55.1904, 30.2049],
+                history: "🎖️ Occupied from July 1941 to June 26, 1944. Vitebsk was a crucial stronghold. 95% of the city was razed. Partisan brigades controlled vast forest zones. The 1944 Vitebsk–Orsha offensive shattered the German 3rd Panzer Army, leading to liberation."
+            },
+            {
+                name: "🌾 GOMEL",
+                coords: [52.4243, 31.0137],
+                history: "🕊️ Captured August 19, 1941, liberated November 26, 1943. During occupation, Nazis murdered over 40,000 civilians. The Gomel underground printed anti-fascist leaflets and derailed trains. Liberation by the Central Front marked the first major Belarusian city freed."
+            },
+            {
+                name: "⛰️ MOGILEV",
+                coords: [53.8945, 30.3366],
+                history: "🏅 Defended heroically for 23 days in July 1941, delaying the German advance. Occupied until June 28, 1944. 70,000 civilians were killed in the city and region. Partisans sabotaged railways. Operation Bagration crushed Army Group Centre near Mogilev."
+            },
+            {
+                name: "🏛️ GRODNO",
+                coords: [53.6779, 23.8341],
+                history: "🕯️ Occupied from June 23, 1941 to July 16, 1944. Two ghettos housed 25,000 Jews, most executed by 1943. The Białystok-Grodno region saw intense partisan actions. Red Army entered after the destruction of German forces."
+            },
+            {
+                name: "💥 BABRUYSK",
+                coords: [53.1384, 29.2214],
+                history: "⚡ Occupied June 28, 1941 – June 29, 1944. The 1944 Babruysk Offensive trapped 70,000 German soldiers in a pocket. Massive airstrikes and tank assaults destroyed the 9th Army. Babruysk became a symbol of Bagration's brilliance."
+            },
+            {
+                name: "🏯 POLOTSK",
+                coords: [55.4868, 28.7797],
+                history: "📯 Ancient city, occupied July 16, 1941 to July 4, 1944. The Polotsk-Lepel partisan zone (over 20,000 fighters) controlled 1000+ km². Intense battles during Polotsk Offensive broke the German defense, cutting vital supply lines."
+            },
+            {
+                name: "🚂 ORSHA",
+                coords: [54.5155, 30.4241],
+                history: "🔧 Key railway hub, occupied July 1941 – June 27, 1944. Under occupation, Orsha's railway workers and partisans executed spectacular sabotage. The 1944 summer offensive by the 11th Guards Army liberated the city, vital for Bagration's logistics."
+            },
+            {
+                name: "🌲 BARANAVICHY",
+                coords: [53.132, 26.0139],
+                history: "🕵️ Occupied from June 25, 1941 to July 8, 1944. Nazi administration and ghetto liquidated over 12,000 Jews. Baranavichy was a center of partisan intelligence (Soviet spy network). Liberation by 1st Belorussian Front."
+            },
+            {
+                name: "💧 PINSK",
+                coords: [52.1151, 26.1031],
+                history: "⚓ Occupied July 4, 1941 – July 14, 1944. Pinsk Ghetto massacre claimed approx. 36,000 Jewish lives. The Polesie marshes sheltered numerous partisan detachments. Red Army paratroopers aided the liberation of this river port."
+            },
+            {
+                name: "🌾 SLONIM",
+                coords: [53.087, 25.316],
+                history: "📖 Occupied June 1941, liberated July 10, 1944. The Slonim Ghetto was liquidated in 1942, with over 10,000 Jews executed. The Slonim–Baranovichi partisan region was a base for sabotage and intelligence gathering."
+            },
+            {
+                name: "⛲ BORISOV",
+                coords: [54.227, 28.505],
+                history: "🚀 Occupied July 2, 1941 – July 1, 1944. Major tank battles near Berezina River. The Borisov underground helped prisoners escape. During Bagration, Borisov was taken after rapid encirclement, paving the way to Minsk."
+            },
+            {
+                name: "🛡️ LIDA",
+                coords: [53.887, 25.302],
+                history: "⚔️ Occupied June 26, 1941 to July 9, 1944. Lida ghetto held about 8,000 Jews, most murdered by autumn 1943. The Lida partisan unit (’Komsomolets’) disrupted German railway supplies. Liberated by the 3rd Belorussian Front."
+            },
+            {
+                name: "🏰 NOVOGRODOK",
+                coords: [53.592, 25.819],
+                history: "📜 Occupied June 1941 – July 8, 1944. The Novogrudok Ghetto (10,000+ Jews) saw an uprising in 1943; many escaped to join the Bielski partisans. The area became a haven for Jewish resistance fighters."
+            },
+            {
+                name: "🍂 MOZYR",
+                coords: [52.039, 29.245],
+                history: "🌿 Occupied August 1941 – January 14, 1944. Mozyr was a center of Polesie partisans. The Kalinkovichi-Mozyr operation (Jan 1944) liberated the city, securing the western approaches for future Bagration."
+            },
+            {
+                name: "🔧 OSIPOVICHI",
+                coords: [53.299, 28.647],
+                history: "💣 Occupied June 1941, liberated June 28, 1944. Famous for the 'Osipovichi sabotage' – partisans blew up a German ammunition train causing massive derailment. Key node on the Minsk–Gomel railway."
+            },
+            {
+                name: "⚙️ ZHLOBIN",
+                coords: [52.894, 30.024],
+                history: "⚡ Occupied July 1941, liberated June 24, 1944. Zhlobin witnessed heavy fighting during Bagration's first phase: the 65th Army broke through German fortifications, enabling advance toward Bobruisk."
+            },
+            {
+                name: "🌲 VOLKOVYSK",
+                coords: [53.156, 24.459],
+                history: "🏔️ Occupied June 1941 – July 14, 1944. The ghetto was liquidated in 1942–43. Volkovysk region served as a partisan 'gateway' connecting Bialowieza Forest units. Liberated during the Białystok offensive."
+            },
+            {
+                name: "🏞️ KOBRIN",
+                coords: [52.216, 24.357],
+                history: "💥 Occupied June 1941 – July 20, 1944. Defense of Kobrin involved NKVD border troops. After liberation, the city was rebuilt. The Kobrin partisan detachment contributed to railway warfare."
+            },
+            {
+                name: "⛰️ MOLODECHNO",
+                coords: [54.311, 26.854],
+                history: "⚙️ Occupied July 1941 – July 5, 1944. The city was a German garrison. Partisans from the Minsk region attacked supply depots. Red Army tanks liberated Molodechno as part of the Vilnius offensive."
+            },
+            {
+                name: "🍞 ROGACHEV",
+                coords: [53.093, 30.049],
+                history: "🎖️ Occupied July 1941 – February 24, 1944. Rogachev–Zhlobin operation created a bridgehead on Dnieper. Germans suffered heavy losses. The city was among first liberated east of Dnieper."
+            }
+        ];
+        
+        // custom red circle marker style: bold red dots
+        const addRedDotMarker = (zone, mapInstance) => {
+            const { name, coords, history } = zone;
+            // Circle marker (red dot)
+            const circle = L.circleMarker(coords, {
+                radius: 9,
+                fillColor: "#e32119",
+                color: "#fff3cf",
+                weight: 2,
+                opacity: 0.95,
+                fillOpacity: 0.85,
+                className: "red-dot-marker"
+            }).addTo(mapInstance);
+            
+            // Prepare rich popup content with HTML formatting
+            const popupContent = `
+                <div style="min-width: 200px; max-width: 280px;">
+                    <div class="popup-title">${name}</div>
+                    <div class="popup-desc">${history}</div>
+                    <hr style="margin: 10px 0; border-color: #b1553e;" />
+                    <span style="font-size: 0.7rem; color: #cfa668;">📅 Great Patriotic War · 1941-1945</span>
+                </div>
+            `;
+            
+            // bind popup
+            circle.bindPopup(popupContent, {
+                className: 'custom-popup',
+                maxWidth: 320,
+                minWidth: 220,
+                autoPan: true
+            });
+            
+            // click event: fly to zone with smooth animation and open popup
+            circle.on('click', (e) => {
+                const targetZoom = 11;    // zoom into the zone for immersion
+                mapInstance.flyTo(coords, targetZoom, {
+                    duration: 1.2,
+                    easeLinearity: 0.4
+                });
+                // open popup after fly? but we open it immediately (popup will follow after map moves, but better open after slight delay)
+                // however opening popup before flyTo works but the popup will appear at current view and then map moves -> popup might move
+                // To ensure smooth: open popup after fly start with timeout. Best UX: open with slight delay after fly.
+                // We'll open popup after a micro timeout so that the map animation completes and user sees marker info.
+                // But we also can open right away, it's fine. I prefer immediate open, but popup will shift.
+                // To fix: open popup, then flyTo, but the popup tracks marker. it's ok! marker moves smoothly.
+                // Actually marker is moving with map, popup will stick to marker. Perfect!
+                circle.openPopup();
+                // additionally add a little highlight effect
+                circle.setStyle({ radius: 13, fillOpacity: 1.0 });
+                setTimeout(() => {
+                    circle.setStyle({ radius: 9, fillOpacity: 0.85 });
+                }, 400);
+            });
+            
+            // optional hover effect (scale)
+            circle.on('mouseover', () => {
+                circle.setStyle({ radius: 12, weight: 3, fillOpacity: 0.95 });
+            });
+            circle.on('mouseout', () => {
+                circle.setStyle({ radius: 9, weight: 2, fillOpacity: 0.85 });
+            });
+            
+            return circle;
+        };
+        
+        // add all war zones as red dots
+        warZones.forEach(zone => addRedDotMarker(zone, map));
+        
+        // Add also a small cluster of partisans / extra dots to enrich "red dots all over" effect, but warZones covers most major regions.
+        // To fullfill "red dots all over" I will include 5 additional minor but historically meaningful locations:
+        const extraZones = [
+            {
+                name: "🌲 LEPEL",
+                coords: [54.878, 28.689],
+                history: "⭐ Lepel region was a huge partisan zone (Lepel 'gate') with over 17,000 partisans. Occupied from July 1941 to June 28, 1944. The 'Lepel Offensive' was a major diversion before Bagration."
+            },
+            {
+                name: "🏞️ DOBRUSH",
+                coords: [52.403, 31.318],
+                history: "🔥 Occupied August 1941 – October 10, 1943. Dobrush paper factory workers formed an underground group. Liberated by the Chernigov-Pripyat operation. Mass graves of civilians."
+            },
+            {
+                name: "🏔️ SMORGON",
+                coords: [54.479, 26.395],
+                history: "⚔️ Occupied June 1941 – July 5, 1944. Smorgon witnessed front-line battles in 1944. The ghetto was exterminated in 1942. Partisans attacked railway stations."
+            },
+            {
+                name: "🌿 BYAROZA",
+                coords: [52.532, 24.978],
+                history: "🕯️ Occupied June 1941 – July 1944. Byaroza fortress (old barracks) used as POW camp. The region's partisans blew up bridges. Liberated by Red Army during Lublin–Brest offensive."
+            },
+            {
+                name: "⛲ CHASHNIKI",
+                coords: [54.858, 29.161],
+                history: "💥 Fierce fighting during the Vitebsk offensive (1944). Occupied July 1941 – June 26, 1944. Partisan brigade 'Alexei' operated near lakes. Liberation opened road to Polotsk."
+            }
+        ];
+        
+        extraZones.forEach(zone => addRedDotMarker(zone, map));
+        
+        // Additional layer: larger context note — add a few more in southern regions to ensure 'all over'
+        const southZones = [
+            {
+                name: "⚓ RECHITSA",
+                coords: [52.361, 30.392],
+                history: "🎖️ Liberated November 18, 1943. One of first cities freed after Dnieper crossing. Rechitsa operation involved river assault and partisan cooperation. Occupied from Aug 1941."
+            },
+            {
+                name: "🌾 KALINKAVICHY",
+                coords: [52.129, 29.336],
+                history: "🗡️ Occupied Aug 1941 – Jan 1944. Kalinkavichy was a partisan stronghold. Partisans held 'Kalinkavichy corridor' supplying Soviet troops. Liberated during Mozyr offensive."
+            }
+        ];
+        southZones.forEach(zone => addRedDotMarker(zone, map));
+        
+        // final touch: small decorative red dots effect? Not needed, we already have 30+ dots covering all regions: west (Brest, Grodno), east (Orsha, Mogilev), north (Vitebsk, Polotsk), south (Pinsk, Mozyr), central.
+        
+        // optional: add a brief legend control (custom)
+        const legendControl = L.control({ position: 'bottomleft' });
+        legendControl.onAdd = function() {
+            const div = L.DomUtil.create('div', 'info legend');
+            div.style.backgroundColor = '#2d281d';
+            div.style.color = '#ffe1b3';
+            div.style.padding = '8px 12px';
+            div.style.borderRadius = '24px';
+            div.style.fontSize = '12px';
+            div.style.fontWeight = 'bold';
+            div.style.border = '1px solid #a73a2c';
+            div.style.boxShadow = '2px 2px 8px rgba(0,0,0,0.4)';
+            div.innerHTML = '<span style="display:inline-block; width:14px; height:14px; background:#e32119; border-radius:50%; margin-right:6px;"></span> 🔴 Historical war zones · click for details';
+            return div;
+        };
+        legendControl.addTo(map);
+        
+        // add also a small layer of red dots showing partisans or additional events for completeness - we already have 30+
+        // Final: ensure map loads perfectly with all markers.
+        
+        // show loading message - minor: set zoom and also one initial popup to greet? not needed, better let user explore.
+        // Make sure all dots are visible: set fit bounds? optional but we set view to belarus region.
+        const bounds = L.latLngBounds([
+            [51.2, 23.1],  // southwest Belarus
+            [56.2, 32.8]    // northeast Belarus
+        ]);
+        map.fitBounds(bounds, { padding: [20, 20] });
+        
+        // subtle effect on load: small info welcome
+        setTimeout(() => {
+            map.openPopup('<div style="font-family:inherit;"><b>🇧🇾 Belarus 1941–1945</b><br/>🔴 Click on any red dot to explore the history of each zone — partisans, battles, liberation.</div>', belarusCenter, {
+                className: 'custom-popup',
+                autoClose: 4000
+            });
+        }, 600);
+    })();
+</script>
+</body>
+</html>
+```
